@@ -1,0 +1,26 @@
+app:
+  mode: stable
+  name: swift-deploy-1
+  version: 1.0.0
+healthcheck:
+  interval: 10
+  path: /healthz
+  retries: 3
+  timeout: 5
+network:
+  driver_type: bridge
+  name: swiftdeploy-net
+nginx:
+  image: nginx:latest
+  port: 8090
+  proxy_timeout: 30
+services:
+  env:
+    APP_PORT: '3000'
+    APP_VERSION: 1.0.0
+    MODE: stable
+  image: swift-deploy-1-node:latest
+  port: 3000
+  restart: unless-stopped
+volumes:
+  logs: swiftdeploy-logs

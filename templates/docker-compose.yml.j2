@@ -1,0 +1,45 @@
+networks:
+  {{ network.name }}:
+    driver: {{ network.driver_type }}
+
+volumes:
+  {{ volumes.logs }}:
+    driver: local
+
+services:
+  app:
+    image: {{ services.image }}
+    restart: {{ services.restart }}
+    networks:
+      - {{ network.name }}
+    environment:
+      - MODE={{ services.env.MODE }}
+      - APP_VERSION={{ services.env.APP_VERSION }}
+      - APP_PORT={{ services.env.APP_PORT }}
+    volumes:
+      - {{ volumes.logs }}:/var/log/app
+    user: "appuser"
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:{{ services.port }}/healthz')"]
+      interval: {{ healthcheck.interval }}s
+      timeout: {{ healthcheck.timeout }}s
+      retries: {{ healthcheck.retries }}
+      start_period: 10s
+    expose:
+      - "{{ services.port }}"
+
+  nginx:
+    image: {{ nginx.image }}
+    restart: {{ services.restart }}
+    networks:
+      - {{ network.name }}
+    ports:
+      - "{{ nginx.port }}:{{ nginx.port }}"
+    volumes:
+      - /home/uwakwenneoma6/swiftdeploy/generated/nginx.conf:/etc/nginx/nginx.conf:ro
+      - {{ volumes.logs }}:/var/log/nginx
+    depends_on:
+      app:
+        condition: service_healthy

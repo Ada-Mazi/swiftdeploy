@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import subprocess
+import time
+import yaml
+import socket
+from jinja2 import Template
+
+BASE = os.path.dirname(os.path.abspath(__file__))
+MANIFEST = os.path.join(BASE, "manifest.yaml")
+TEMPLATES_DIR = os.path.join(BASE, "templates")
+GENERATED_DIR = os.path.join(BASE, "generated")
+NGINX_CONF = os.path.join(GENERATED_DIR, "nginx.conf")
+COMPOSE_FILE = os.path.join(GENERATED_DIR, "docker-compose.yml")
+
+
+def load_manifest():
+    with open(MANIFEST) as f:
+        return yaml.safe_load(f)
+
+
+def run(cmd, check=True, capture=False):
+    if capture:
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        return result
+    subprocess.run(cmd, shell=True, check=check)
+
+
+def cmd_init():
+    print("[swiftdeploy] Running init...")
+    os.makedirs(GENERATED_DIR, exist_ok=True)
+    cfg = load_manifest()
+
+    # Generate nginx.conf
+    with open(os.path.join(TEMPLATES_DIR, "nginx.conf.j2")) as f:
+        tmpl = Template(f.read())
+    nginx_conf = tmpl.render(**cfg)
+    with open(NGINX_CONF, "w") as f:
+        f.write(nginx_conf)
+    print("[swiftdeploy] Generated: generated/nginx.conf")
+
+    # Generate docker-compose.yml
+    with open(os.path.join(TEMPLATES_DIR, "docker-compose.yml.j2")) as f:
+        tmpl = Template(f.read())
+    compose = tmpl.render(**cfg)
+    with open(COMPOSE_FILE, "w") as f:
+        f.write(compose)
+    print("[swiftdeploy] Generated: generated/docker-compose.yml")
+    print("[swiftdeploy] Init complete.")
+
+
+def cmd_validate():
+    print("[swiftdeploy] Running validate...")
+    passed = 0
+    failed = 0
+
+    def check(name, result, msg=""):
+        nonlocal passed, failed
+        if result:
+            print(f"  [PASS] {name}")
+            passed += 1
+        else:
+            print(f"  [FAIL] {name}{': ' + msg if msg else ''}")
+            failed += 1
+
+    # Check 1: manifest.yaml exists and is valid YAML
+    try:
+        cfg = load_manifest()
+        check("manifest.yaml exists and is valid YAML", True)
+    except Exception as e:
+        check("manifest.yaml exists and is valid YAML", False, str(e))
+        print(f"\n[swiftdeploy] {failed} check(s) failed. Exiting.")
+        sys.exit(1)
+
+    # Check 2: Required fields present and non-empty
+    required = [
+        ("services.image", cfg.get("services", {}).get("image")),
+        ("services.port", cfg.get("services", {}).get("port")),
+        ("nginx.image", cfg.get("nginx", {}).get("image")),
+        ("nginx.port", cfg.get("nginx", {}).get("port")),
+        ("network.name", cfg.get("network", {}).get("name")),
+        ("network.driver_type", cfg.get("network", {}).get("driver_type")),
+    ]
+    all_present = all(v for _, v in required)
+    missing = [k for k, v in required if not v]
+    check("All required fields present and non-empty", all_present,
+          "Missing: " + ", ".join(missing) if missing else "")
+
+    # Check 3: Docker image exists locally
+    image = cfg.get("services", {}).get("image", "")
+    result = run(f"docker image inspect {image} 2>/dev/null", check=False, capture=True)
+    check(f"Docker image '{image}' exists locally", result.returncode == 0,
+          "Run: docker build -t " + image + " app/")
+
+    # Check 4: Nginx port not already bound
+    nginx_port = cfg.get("nginx", {}).get("port", 8080)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(1)
+        result_conn = s.connect_ex(("0.0.0.0", nginx_port))
+        s.close()
+        port_free = result_conn != 0
+    except Exception:
+        port_free = True
+    check(f"Nginx port {nginx_port} is not already bound", port_free,
+          f"Port {nginx_port} is already in use")
+
+    # Check 5: nginx.conf is syntactically valid
+    if os.path.exists(NGINX_CONF):
+        result = run(
+            f"docker run --rm -v {NGINX_CONF}:/etc/nginx/nginx.conf:ro --add-host=app:127.0.0.1 nginx:latest nginx -t 2>&1",
+            check=False, capture=True
+        )
+        valid = result.returncode == 0
+        check("Generated nginx.conf is syntactically valid", valid,
+              result.stdout.strip() if not valid else "")
+    else:
+        check("Generated nginx.conf is syntactically valid", False,
+              "nginx.conf not found — run swiftdeploy init first")
+
+    print(f"\n[swiftdeploy] Validation complete: {passed} passed, {failed} failed.")
+    if failed > 0:
+        sys.exit(1)
+
+
+def cmd_deploy():
+    print("[swiftdeploy] Running deploy...")
+    cmd_init()
+
+    print("[swiftdeploy] Building Docker image...")
+    cfg = load_manifest()
+    image = cfg["services"]["image"]
+    run(f"docker build -t {image} {os.path.join(BASE, 'app')}")
+
+    print("[swiftdeploy] Starting stack...")
+    run(f"docker compose -f {COMPOSE_FILE} up -d")
+
+    print("[swiftdeploy] Waiting for health checks...")
+    port = cfg["nginx"]["port"]
+    deadline = time.time() + 60
+    healthy = False
+    while time.time() < deadline:
+        result = run(f"curl -s http://localhost:{port}/healthz", check=False, capture=True)
+        if result.returncode == 0 and "ok" in result.stdout:
+            healthy = True
+            break
+        time.sleep(3)
+
+    if healthy:
+        print(f"[swiftdeploy] Stack is healthy! Dashboard: http://localhost:{port}")
+    else:
+        print("[swiftdeploy] ERROR: Health checks did not pass within 60 seconds.")
+        sys.exit(1)
+
+
+def cmd_promote(mode):
+    if mode not in ("stable", "canary"):
+        print("[swiftdeploy] Usage: swiftdeploy promote [stable|canary]")
+        sys.exit(1)
+
+    print(f"[swiftdeploy] Promoting to {mode} mode...")
+    cfg = load_manifest()
+
+    # Update manifest.yaml in-place
+    cfg["app"]["mode"] = mode
+    cfg["services"]["env"]["MODE"] = mode
+    with open(MANIFEST, "w") as f:
+        yaml.dump(cfg, f, default_flow_style=False)
+    print(f"[swiftdeploy] Updated manifest.yaml: mode={mode}")
+
+    # Regenerate docker-compose.yml
+    with open(os.path.join(TEMPLATES_DIR, "docker-compose.yml.j2")) as f:
+        tmpl = Template(f.read())
+    compose = tmpl.render(**cfg)
+    with open(COMPOSE_FILE, "w") as f:
+        f.write(compose)
+    print("[swiftdeploy] Regenerated docker-compose.yml")
+
+    # Restart only the app container
+    print("[swiftdeploy] Restarting app container...")
+    run(f"docker compose -f {COMPOSE_FILE} up -d --no-deps app")
+
+    # Wait and confirm
+    print("[swiftdeploy] Confirming new mode via /healthz...")
+    port = cfg["nginx"]["port"]
+    deadline = time.time() + 60
+    confirmed = False
+    while time.time() < deadline:
+        result = run(f"curl -s http://localhost:{port}/healthz", check=False, capture=True)
+        if result.returncode == 0 and "ok" in result.stdout:
+            confirmed = True
+            print(f"[swiftdeploy] Mode confirmed: {mode}")
+            print(f"[swiftdeploy] /healthz response: {result.stdout.strip()}")
+            break
+        time.sleep(3)
+
+    if not confirmed:
+        print("[swiftdeploy] ERROR: Could not confirm new mode.")
+        sys.exit(1)
+
+
+def cmd_teardown(clean=False):
+    print("[swiftdeploy] Running teardown...")
+    if os.path.exists(COMPOSE_FILE):
+        run(f"docker compose -f {COMPOSE_FILE} down -v", check=False)
+    if clean:
+        for f in [NGINX_CONF, COMPOSE_FILE]:
+            if os.path.exists(f):
+                os.remove(f)
+                print(f"[swiftdeploy] Deleted: {f}")
+    print("[swiftdeploy] Teardown complete.")
+
+
+def main():
+    args = sys.argv[1:]
+    if not args:
+        print("Usage: swiftdeploy [init|validate|deploy|promote|teardown]")
+        sys.exit(1)
+
+    cmd = args[0]
+    if cmd == "init":
+        cmd_init()
+    elif cmd == "validate":
+        cmd_validate()
+    elif cmd == "deploy":
+        cmd_deploy()
+    elif cmd == "promote":
+        if len(args) < 2:
+            print("Usage: swiftdeploy promote [stable|canary]")
+            sys.exit(1)
+        cmd_promote(args[1])
+    elif cmd == "teardown":
+        cmd_teardown("--clean" in args)
+    else:
+        print(f"Unknown command: {cmd}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
