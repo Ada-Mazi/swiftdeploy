@@ -11,9 +11,9 @@ from jinja2 import Template
 BASE = os.path.dirname(os.path.abspath(__file__))
 MANIFEST = os.path.join(BASE, "manifest.yaml")
 TEMPLATES_DIR = os.path.join(BASE, "templates")
-GENERATED_DIR = os.path.join(BASE, "generated")
-NGINX_CONF = os.path.join(GENERATED_DIR, "nginx.conf")
-COMPOSE_FILE = os.path.join(GENERATED_DIR, "docker-compose.yml")
+GENERATED_DIR = BASE
+NGINX_CONF = os.path.join(BASE, "nginx.conf")
+COMPOSE_FILE = os.path.join(BASE, "docker-compose.yml")
 
 
 def load_manifest():
@@ -30,7 +30,7 @@ def run(cmd, check=True, capture=False):
 
 def cmd_init():
     print("[swiftdeploy] Running init...")
-    os.makedirs(GENERATED_DIR, exist_ok=True)
+    # files generated in root directory
     cfg = load_manifest()
 
     # Generate nginx.conf
@@ -39,7 +39,7 @@ def cmd_init():
     nginx_conf = tmpl.render(**cfg)
     with open(NGINX_CONF, "w") as f:
         f.write(nginx_conf)
-    print("[swiftdeploy] Generated: generated/nginx.conf")
+    print("[swiftdeploy] Generated: nginx.conf")
 
     # Generate docker-compose.yml
     with open(os.path.join(TEMPLATES_DIR, "docker-compose.yml.j2")) as f:
@@ -47,7 +47,7 @@ def cmd_init():
     compose = tmpl.render(**cfg)
     with open(COMPOSE_FILE, "w") as f:
         f.write(compose)
-    print("[swiftdeploy] Generated: generated/docker-compose.yml")
+    print("[swiftdeploy] Generated: docker-compose.yml")
     print("[swiftdeploy] Init complete.")
 
 
