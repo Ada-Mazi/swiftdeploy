@@ -1,13 +1,13 @@
 package canary
 
 import future.keywords.if
-import future.keywords.in
+import future.keywords.contains
 
-default allow = false
-default deny_reasons = []
+default allow := false
 
 allow if {
-    count(deny_reasons) == 0
+    input.error_rate <= data.thresholds.max_error_rate
+    input.p99_latency_ms <= data.thresholds.max_p99_latency_ms
 }
 
 deny_reasons contains msg if {

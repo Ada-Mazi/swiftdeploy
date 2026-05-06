@@ -1,9 +1,6 @@
 networks:
   {{ network.name }}:
     driver: {{ network.driver_type }}
-  opa-internal:
-    driver: bridge
-    internal: true
 
 volumes:
   {{ volumes.logs }}:
@@ -50,10 +47,7 @@ services:
   opa:
     image: openpolicyagent/opa:latest-static
     restart: {{ services.restart }}
-    networks:
-      - opa-internal
-    ports:
-      - "8181:8181"
+    network_mode: host
     volumes:
       - /home/uwakwenneoma6/swiftdeploy/policies:/policies:ro
     command:

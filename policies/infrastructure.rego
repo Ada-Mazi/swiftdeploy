@@ -1,13 +1,14 @@
 package infrastructure
 
 import future.keywords.if
-import future.keywords.in
+import future.keywords.contains
 
-default allow = false
-default deny_reasons = []
+default allow := false
 
 allow if {
-    count(deny_reasons) == 0
+    input.disk_free_gb >= data.thresholds.min_disk_free_gb
+    input.cpu_load <= data.thresholds.max_cpu_load
+    input.mem_free_percent >= data.thresholds.min_mem_free_percent
 }
 
 deny_reasons contains msg if {

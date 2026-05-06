@@ -1,5 +1,5 @@
 app:
-  mode: canary
+  mode: stable
   name: swift-deploy-1
   version: 1.0.0
 healthcheck:
@@ -18,7 +18,7 @@ services:
   env:
     APP_PORT: '3000'
     APP_VERSION: 1.0.0
-    MODE: canary
+    MODE: stable
   image: nneoma-swiftdeploy:latest
   port: 3000
   restart: unless-stopped
