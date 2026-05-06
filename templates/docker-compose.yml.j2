@@ -1,6 +1,9 @@
 networks:
   {{ network.name }}:
     driver: {{ network.driver_type }}
+  opa-internal:
+    driver: bridge
+    internal: true
 
 volumes:
   {{ volumes.logs }}:
@@ -43,3 +46,18 @@ services:
     depends_on:
       app:
         condition: service_healthy
+
+  opa:
+    image: openpolicyagent/opa:latest-static
+    restart: {{ services.restart }}
+    networks:
+      - opa-internal
+    volumes:
+      - /home/uwakwenneoma6/swiftdeploy/policies:/policies:ro
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--data=/policies"
+    expose:
+      - "8181"
