@@ -52,12 +52,12 @@ services:
     restart: {{ services.restart }}
     networks:
       - opa-internal
+    ports:
+      - "8181:8181"
     volumes:
       - /home/uwakwenneoma6/swiftdeploy/policies:/policies:ro
     command:
       - "run"
       - "--server"
       - "--addr=0.0.0.0:8181"
-      - "--data=/policies"
-    expose:
-      - "8181"
+      - "/policies"
