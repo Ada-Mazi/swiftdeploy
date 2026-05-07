@@ -21,3 +21,17 @@
 {"timestamp": "2026-05-07T07:10:14.459650+00:00", "event": "deploy", "status": "success"}
 {"timestamp": "2026-05-07T07:10:33.667328+00:00", "event": "promote", "mode": "canary", "status": "success"}
 {"timestamp": "2026-05-07T07:10:54.445150+00:00", "metrics": {"total_requests": 1, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": false}
+{"timestamp": "2026-05-07T07:50:44.816291+00:00", "metrics": {"total_requests": 4, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": null}
+{"timestamp": "2026-05-07T07:52:53.696986+00:00", "metrics": {"total_requests": 0, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": null}
+{"timestamp": "2026-05-07T07:54:30.447844+00:00", "metrics": {"total_requests": 1, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": null}
+{"timestamp": "2026-05-07T07:55:43.758235+00:00", "metrics": {"total_requests": 2, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": null}
+{"timestamp": "2026-05-07T07:56:54.998738+00:00", "metrics": {"total_requests": 3, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": null}
+{"timestamp": "2026-05-07T07:58:04.481775+00:00", "metrics": {"total_requests": 4, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": null}
+{"timestamp": "2026-05-07T07:59:43.502313+00:00", "metrics": {"total_requests": 0, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": null}
+{"timestamp": "2026-05-07T08:01:03.638777+00:00", "metrics": {}, "infra_policy": null}
+{"timestamp": "2026-05-07T08:53:49.260717+00:00", "metrics": {}, "infra_policy": null}
+{"timestamp": "2026-05-07T08:55:08.220375+00:00", "metrics": {}, "infra_policy": null}
+{"timestamp": "2026-05-07T08:57:25.390433+00:00", "metrics": {}, "infra_policy": null}
+{"timestamp": "2026-05-07T09:07:48.098498+00:00", "metrics": {}, "infra_policy": true}
+{"timestamp": "2026-05-07T09:09:08.500538+00:00", "metrics": {"total_requests": 2, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": true}
+{"timestamp": "2026-05-07T09:09:46.496834+00:00", "metrics": {"total_requests": 3, "error_requests": 0, "error_rate": 0.0, "p99_latency_ms": 0}, "infra_policy": true}

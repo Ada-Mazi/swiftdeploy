@@ -47,7 +47,10 @@ services:
   opa:
     image: openpolicyagent/opa:latest-static
     restart: {{ services.restart }}
-    network_mode: host
+    networks:
+      - {{ network.name }}
+    ports:
+      - "8181:8181"
     volumes:
       - /home/uwakwenneoma6/swiftdeploy/policies:/policies:ro
     command:
